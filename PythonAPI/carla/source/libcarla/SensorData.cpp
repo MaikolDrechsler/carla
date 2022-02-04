@@ -21,6 +21,8 @@
 #include <carla/sensor/data/RadarMeasurement.h>
 #include <carla/sensor/data/DVSEventArray.h>
 
+#include <carla/sensor/data/ProbabilisticEvent.h>
+
 #include <carla/sensor/data/RadarData.h>
 
 #include <boost/python/suite/indexing/vector_indexing_suite.hpp>
@@ -555,4 +557,15 @@ void export_sensor_data() {
     .def("to_array_pol", CALL_RETURNING_LIST(csd::DVSEventArray, ToArrayPol))
     .def(self_ns::str(self_ns::self))
   ;
+  
+    class_<csd::ProbabilisticEvent, bases<cs::SensorData>, boost::noncopyable, boost::shared_ptr<csd::ProbabilisticEvent>>("ProbabilisticEvent", no_init)              // name, and disable construction.
+  .def("__len__", &csd::ProbabilisticEvent::size)
+  .def("__iter__", iterator<csd::ProbabilisticEvent>())
+  .def("__getitem__", +[](const csd::ProbabilisticEvent &self, size_t pos) -> cr::ActorId {
+    return self.at(pos);
+  })
+  ;
+
+  
+  
 }
