@@ -14,6 +14,7 @@ UCLASS()
 class CARLA_API AProbabilisticSensor : public ASensor
 {
   GENERATED_BODY()
+  using FProbabilisticSensor = carla::sensor::data::ProbabilisticData;
 
 public:
   AProbabilisticSensor(const FObjectInitializer &ObjectInitializer);

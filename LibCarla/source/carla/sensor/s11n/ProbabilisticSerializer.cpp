@@ -13,7 +13,8 @@ namespace sensor {
 namespace s11n {
 
   SharedPtr<SensorData> ProbabilisticSerializer::Deserialize(RawData &&data) {
-    return SharedPtr<SensorData>(new data::ProbabilisticEvent(std::move(data)));
+    return SharedPtr<data::ProbabilisticData>(new data::ProbabilisticEvent{std::move(data)});
+
   }
 
 } // namespace s11n

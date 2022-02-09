@@ -215,6 +215,9 @@ void AProbabilisticSensor::Tick(float DeltaSeconds)
 {
   Super::Tick(DeltaSeconds);
 
+  //Initiate the Objectlist to the streaming
+  TArray<FProbabilisticSensor> SendActors;
+
   // Define the Parameters for Linetrace
   TraceParams = FCollisionQueryParams(FName(TEXT("Laser_Trace")), true, GetOwner());
   TraceParams.bTraceComplex = true;
@@ -295,10 +298,10 @@ void AProbabilisticSensor::Tick(float DeltaSeconds)
           if (actor != nullptr)
           {
             UE_LOG(LogTemp, Warning, TEXT("The Laser hit the %s"), *actor->GetName()) // Uncomment for Debugging
-            const FCarlaActor *view = Registry.FindCarlaActor(actor);
-            if (view)
+            const FCarlaActor *ActualActor = Registry.FindCarlaActor(actor);
+            if (ActualActor)
             {
-              LineTraceObjIdx = view->GetActorId();
+              LineTraceObjIdx = ActualActor->GetActorId();
             }
           }
           else
@@ -314,9 +317,59 @@ void AProbabilisticSensor::Tick(float DeltaSeconds)
         else
         {
           UE_LOG(LogTemp, Warning, TEXT("%p is in the FOV and is visible!!!!"), Object);
+          FProbabilisticSensor TempActor; 
+          if (Probabilistic.NoiseType == 0)/// Type of noise 0:Ideal
+          {
+            FVector TempOrigin;
+            FVector TempDimension;
+            TempActor.ObjectID = LineTraceObjIdx; 
+            TempActor.Position = RelativePosition;
+            Object -> GetActorBounds(false, TempOrigin, TempDimension);
+            TempActor.Dimension = TempDimension*2;
+            FRotator TempRotator = Object -> GetActorRotation();
+            TempActor.Orientation = {TempRotator.Roll, TempRotator.Pitch, TempRotator.Yaw}; 
+            TempActor.Velocity = Object -> GetVelocity();
+            TempActor.Classification = 1;
+
+            SendActors.Emplace(TempActor);
+            }
+          else if (Probabilistic.NoiseType == 1)/// Type of noise 1:Cartesian (Camera and Lidar).
+          {
+            FVector TempOrigin;
+            // include errors
+            /*
+            const auto Noise = ForwardVector * RandomEngine->GetNormalDistribution(0.0f, Description.NoiseStdDev);
+            Detection.point += Noise*/
+            FVector TempDimension;
+            TempActor.ObjectID = LineTraceObjIdx; 
+            TempActor.Position = RelativePosition;
+            Object -> GetActorBounds(false, TempOrigin, TempDimension);
+            TempActor.Dimension = TempDimension*2;
+            FRotator TempRotator = Object -> GetActorRotation();
+            TempActor.Orientation = {TempRotator.Roll, TempRotator.Pitch, TempRotator.Yaw}; 
+            TempActor.Velocity = Object -> GetVelocity();
+            TempActor.Classification = 1;
+
+            SendActors.Emplace(TempActor);
+          }
+          else if (Probabilistic.NoiseType == 2)/// Type of noise 2:Spherical (Radar).
+          {
+
+            //Tranform the coordinates 
+            FVector TempOrigin;
+            FVector TempDimension;
+            TempActor.ObjectID = LineTraceObjIdx; 
+            TempActor.Position = RelativePosition;
+            Object -> GetActorBounds(false, TempOrigin, TempDimension);
+            TempActor.Dimension = TempDimension*2;
+            FRotator TempRotator = Object -> GetActorRotation();
+            TempActor.Orientation = {TempRotator.Roll, TempRotator.Pitch, TempRotator.Yaw}; 
+            TempActor.Velocity = Object -> GetVelocity();
+            TempActor.Classification = 1;
+            SendActors.Emplace(TempActor);
+          }
         }
       }
-
       // In Case it is out of the FOV
       else
       {
@@ -324,32 +377,7 @@ void AProbabilisticSensor::Tick(float DeltaSeconds)
       }
     }
 
-    // include errors
-    /*
-    const auto Noise = ForwardVector * RandomEngine->GetNormalDistribution(0.0f, Description.NoiseStdDev);
-    Detection.point += Noise*/
-
-    /*  float ARadar::CalculateRelativeVelocity(const FHitResult& OutHit, const FVector& RadarLocation){
-      constexpr float TO_METERS = 1e-2;
-
-      const TWeakObjectPtr<AActor> HittedActor = OutHit.Actor;
-      const FVector TargetVelocity = HittedActor->GetVelocity();
-      const FVector TargetLocation = OutHit.ImpactPoint;
-      const FVector Direction = (TargetLocation - RadarLocation).GetSafeNormal();
-      const FVector DeltaVelocity = (TargetVelocity - CurrentVelocity);
-      const float V = TO_METERS * FVector::DotProduct(DeltaVelocity, Direction);
-
-      return V;
-    }*/
     auto Stream = GetDataStream(*this);
-    Stream.Send(*this, GetEpisode(), DetectedActors);
-
-    // Change in the ProbabilisticSerializer.h what is being sent.
+    Stream.Send(*this, SendActors);
   }
 }
-
-/* TODO:
-Create a separated method to process each object;
-Include errors; 
-Permit sending the complete data; 
-*/

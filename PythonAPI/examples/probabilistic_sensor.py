@@ -31,13 +31,19 @@ blueprint.set_attribute('range', '10.0')
 trans = carla.Transform(carla.Location(x=2.0, y=0.0, z=1.1), carla.Rotation(pitch=0.0, yaw=0.0, roll=0.0))
 sensor = world.spawn_actor(blueprint, trans, attach_to=ego)
 print(carla.Transform)
-
+#print (dir(sensor))
+#print(sensor.getattribute('range'))
 
 def callback(event):
-    print(event)
-    for actor_id in event:
-        vehicle = world.get_actor(actor_id)
-        print('Vehicle too close: %s' % vehicle.type_id)
+    print(dir(event))
+    ##for actor_id in event:
+        ##vehicle = world.get_actor(actor_id)
+        ##print('Vehicle too close: %s' % vehicle.type_id)
+
+    for actor in event:
+        ##print('Vehicle too close: %s' % actor)
+        print(actor)
+
 
 sensor.listen(callback)
 
