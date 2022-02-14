@@ -12,8 +12,9 @@ namespace carla {
 namespace sensor {
 namespace s11n {
 
-  SharedPtr<SensorData> ProbabilisticSerializer::Deserialize(RawData &&data) {
-    return SharedPtr<data::ProbabilisticData>(new data::ProbabilisticEvent{std::move(data)});
+  SharedPtr<SensorData> ProbabilisticSerializer::Deserialize(RawData &&data) 
+  {
+    return SharedPtr<data::ProbabilisticEvent>(new data::ProbabilisticEvent{std::move(data)});
 
   }
 

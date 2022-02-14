@@ -24,20 +24,8 @@ vehicles = world.get_actors().filter('vehicle.*')
 ego = vehicles[0]
 blueprint_library = world.get_blueprint_library()
 
-blueprint = blueprint_library.find('sensor.other.probabilistic')
-#blueprint_car = world.get_blueprint_library().filter("vehicle.*")
-#for i in range(len(blueprint_car)):
-#    print(blueprint_car[i])
-
-#blueprint_walker = world.get_blueprint_library().filter("walker.*")
-
-#for i in range(len(blueprint_walker)):
-#    print(blueprint_walker[i])
-
-
+blueprint = blueprint_library.find('sensor.other.radar')
 #print (dir(blueprint))
-blueprint.set_attribute('noise_seed', '0.0')
-blueprint.set_attribute('range', '30.0')
 trans = carla.Transform(carla.Location(x=2.0, y=0.0, z=1.1), carla.Rotation(pitch=0.0, yaw=0.0, roll=0.0))
 sensor = world.spawn_actor(blueprint, trans, attach_to=ego)
 print(carla.Transform)
@@ -45,14 +33,11 @@ print(carla.Transform)
 #print(sensor.getattribute('range'))
 
 def callback(event):
-    #import struct
-    # print(dir(event))
-    #for actor_id in event:
+    print(dir(event))
+    ##for actor_id in event:
         ##vehicle = world.get_actor(actor_id)
         ##print('Vehicle too close: %s' % vehicle.type_id)
-    #if len(event) == 10:
-    #print(event)
-    #print(event[0], struct.unpack('f', struct.pack('i', event[1])), event[9])
+
     for actor in event:
         ##print('Vehicle too close: %s' % actor)
         print(actor)

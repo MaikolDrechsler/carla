@@ -148,6 +148,22 @@ namespace data {
     return out;
   }
 
+  std::ostream &operator<<(std::ostream &out, const ProbabilisticData &det) {
+    out << "ProbabilisticData(objectid=" << std::to_string(det.objectid)
+        << ", position_x=" << std::to_string(det.position_x)
+        << ", position_y=" << std::to_string(det.position_y)
+        << ", velocity_x=" << std::to_string(det.velocity_x)
+        << ", velocity_y=" << std::to_string(det.velocity_y)
+        << ", orientation=" << std::to_string(det.orientation)
+        << ", length=" << std::to_string(det.length)
+        << ", width=" << std::to_string(det.width)
+        << ", height=" << std::to_string(det.height)
+        << ", classification=" << std::to_string(det.classification)
+        << ')';
+    return out;
+  }
+
+
   std::ostream &operator<<(std::ostream &out, const LidarDetection &det) {
     out << "LidarDetection(x=" << std::to_string(det.point.x)
         << ", y=" << std::to_string(det.point.y)
@@ -557,11 +573,26 @@ void export_sensor_data() {
     .def("to_array_pol", CALL_RETURNING_LIST(csd::DVSEventArray, ToArrayPol))
     .def(self_ns::str(self_ns::self))
   ;
-  
+
+  class_<csd::ProbabilisticData>("ProbabilisticData")
+    .def_readwrite("objectid", &csd::ProbabilisticData::objectid)
+    .def_readwrite("position_x", &csd::ProbabilisticData::position_x)
+    .def_readwrite("position_y", &csd::ProbabilisticData::position_y)
+    .def_readwrite("velocity_x", &csd::ProbabilisticData::velocity_x)
+    .def_readwrite("velocity_y", &csd::ProbabilisticData::velocity_y)
+    .def_readwrite("orientation", &csd::ProbabilisticData::orientation)
+    .def_readwrite("length", &csd::ProbabilisticData::length)
+    .def_readwrite("width", &csd::ProbabilisticData::width)
+    .def_readwrite("height", &csd::ProbabilisticData::height)
+    .def_readwrite("classification", &csd::ProbabilisticData::classification)
+    .def(self_ns::str(self_ns::self))
+  ;
+   
+
     class_<csd::ProbabilisticEvent, bases<cs::SensorData>, boost::noncopyable, boost::shared_ptr<csd::ProbabilisticEvent>>("ProbabilisticEvent", no_init)              // name, and disable construction.
   .def("__len__", &csd::ProbabilisticEvent::size)
   .def("__iter__", iterator<csd::ProbabilisticEvent>())
-  .def("__getitem__", +[](const csd::ProbabilisticEvent &self, size_t pos) -> cr::ActorId {
+  .def("__getitem__", +[](const csd::ProbabilisticEvent &self, size_t pos) -> csd::ProbabilisticData {
     return self.at(pos);
   })
   ;

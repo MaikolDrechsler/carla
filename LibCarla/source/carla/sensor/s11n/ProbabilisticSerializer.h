@@ -7,8 +7,8 @@
 
 #pragma once
 
+//#include "Carla.h"
 #include "carla/Memory.h"
-#include "carla/rpc/ActorId.h"
 #include "carla/sensor/RawData.h"
 #include "carla/sensor/data/ProbabilisticData.h"
 
@@ -22,53 +22,23 @@ namespace sensor {
 
 namespace s11n {
 
-  class ProbabilisticSerializer {
-  using FProbabilisticSensor = carla::sensor::data::ProbabilisticData;
-  
-  public:
+  class ProbabilisticSerializer 
+  {
+    using FProbabilisticSensor = carla::sensor::data::ProbabilisticData;
+    
+    public:
 
-    template <typename SensorT, typename ActorListT>
-    static Buffer Serialize( const SensorT &, const ActorListT &detected_actors) 
-    {
-      const uint32_t size_in_bytes = sizeof(FProbabilisticSensor) * detected_actors.Num();
-      Buffer buffer{size_in_bytes};
-      unsigned char *it = buffer.data();
-      //std::memcpy(it, ActorListT, sizeof(FProbabilisticSensor));
-      
-      for (carla::sensor::data::ProbabilisticData actor : detected_actors) 
+      template <typename SensorT, typename ActorListT>
+      static Buffer Serialize( const SensorT &, const ActorListT &data) 
       {
-        std::memcpy(it, &actor, sizeof(FProbabilisticSensor));
-        it += sizeof(FProbabilisticSensor);
-      }
+      const uint32_t size_in_bytes = sizeof(FProbabilisticSensor) * data.size();
+      Buffer buffer{size_in_bytes};
+      buffer.copy_from(data); 
       return buffer;
-    }
+      }
+
     static SharedPtr<SensorData> Deserialize(RawData &&data);
   };
-
-
-
-  //class ProbabilisticSerializer {
-  //public:
-
-  //  template <typename SensorT, typename EpisodeT, typename ActorListT>
-  //  static Buffer Serialize(
-  //      const SensorT &,
-  //      const EpisodeT &episode,
-  //      const ActorListT &detected_actors) {
-  //    const uint32_t size_in_bytes = sizeof(ActorId) * detected_actors.Num();
-  //    Buffer buffer{size_in_bytes};
-  //    unsigned char *it = buffer.data();
-  //    for (auto *actor : detected_actors) {
-  //      ActorId id = episode.FindCarlaActor(actor) -> GetActorId();
-  //      std::memcpy(it, &id, sizeof(ActorId));
-  //      it += sizeof(ActorId);
-  //    }
-  //    return buffer;
-  //  }
-
-  //  static SharedPtr<SensorData> Deserialize(RawData &&data);
-  //};
-
 
 } // namespace s11n
 } // namespace sensor

@@ -1285,8 +1285,8 @@ def main():
     argparser.add_argument(
         '--generation',
         metavar='G',
-        default='2',
-        help='restrict to certain actor generation (values: "1","2","All" - default: "2")')
+        default='All',
+        help='restrict to certain actor generation (values: "1","2","All" - default: "All")')
     argparser.add_argument(
         '--rolename',
         metavar='NAME',

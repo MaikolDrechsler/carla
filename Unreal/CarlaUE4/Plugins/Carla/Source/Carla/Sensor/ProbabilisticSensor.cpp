@@ -4,6 +4,7 @@
 #include "Carla/Game/CarlaEpisode.h"
 #include "Carla/Util/BoundingBoxCalculator.h"
 #include "Carla/Vehicle/CarlaWheeledVehicle.h"
+#include "Math/UnrealMathUtility.h"
 
 #define PI 3.14159265
 
@@ -12,7 +13,7 @@ AProbabilisticSensor::AProbabilisticSensor(const FObjectInitializer &ObjectIniti
 {
   Capsule = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CapsuleOverlap"));
   Capsule->SetupAttachment(RootComponent);
-  Capsule->SetHiddenInGame(false); // Disable for debugging.
+  //Capsule->SetHiddenInGame(false); // Uncomment for debugging.
   Capsule->SetCollisionProfileName(FName("OverlapAll"));
 
   PrimaryActorTick.bCanEverTick = true;
@@ -42,12 +43,6 @@ FActorDefinition AProbabilisticSensor::GetSensorDefinition()
   Range.bRestrictToRecommended = false;
 
   // - Sensor Field of View  --------------------------
-  FActorVariation VerticalFOV;
-  VerticalFOV.Id = TEXT("vertical_fov");
-  VerticalFOV.Type = EActorAttributeType::Float;
-  VerticalFOV.RecommendedValues = {TEXT("180.0")};
-  VerticalFOV.bRestrictToRecommended = false;
-
   FActorVariation HorizontalFOV;
   HorizontalFOV.Id = TEXT("horizontal_fov");
   HorizontalFOV.Type = EActorAttributeType::Float;
@@ -115,7 +110,7 @@ FActorDefinition AProbabilisticSensor::GetSensorDefinition()
   VelStdDevVertical.RecommendedValues = {TEXT("1.0")};
   VelStdDevVertical.bRestrictToRecommended = false;
 
-  Definition.Variations.Append({NoiseType, Range, VerticalFOV, HorizontalFOV, NoiseSeed, StdDevX, StdDevY, StdDevZ, StdDevR, StdDevHorizontal, StdDevVertical, VelStdDevR, VelStdDevHorizontal, VelStdDevVertical});
+  Definition.Variations.Append({NoiseType, Range, HorizontalFOV, NoiseSeed, StdDevX, StdDevY, StdDevZ, StdDevR, StdDevHorizontal, StdDevVertical, VelStdDevR, VelStdDevHorizontal, VelStdDevVertical});
 
   return Definition;
 }
@@ -132,10 +127,6 @@ void AProbabilisticSensor::Set(const FActorDescription &Description)
       "range",
       Description.Variations,
       100.f);
-  Probabilistic.Fov.Vertical = UActorBlueprintFunctionLibrary::RetrieveActorAttributeToFloat(
-      "vertical_fov",
-      Description.Variations,
-      180.f);
   Probabilistic.Fov.Horizontal = UActorBlueprintFunctionLibrary::RetrieveActorAttributeToFloat(
       "horizontal_fov",
       Description.Variations,
@@ -187,11 +178,11 @@ void AProbabilisticSensor::Set(const FActorDescription &Description)
   }
   else if (Probabilistic.NoiseType == 1)
   {
-    UE_LOG(LogTemp, Warning, TEXT("A probabilistic sensor with spherical noise was spawned"));
+    UE_LOG(LogTemp, Warning, TEXT("A probabilistic sensor with cartesian noise was spawned"));
   }
   else if (Probabilistic.NoiseType == 2)
   {
-    UE_LOG(LogTemp, Warning, TEXT("A probabilistic sensor with cartesian noise was spawned"));
+    UE_LOG(LogTemp, Warning, TEXT("A probabilistic sensor with spherical noise was spawned"));
   }
   else
   {
@@ -207,16 +198,15 @@ void AProbabilisticSensor::SetOwner(AActor *Owner)
 {
   Super::SetOwner(Owner);
 
-  // auto BoundingBox = UBoundingBoxCalculator::GetActorBoundingBox(Owner);
-  // Box->SetBoxExtent(BoundingBox.Extent + Box->GetUnscaledBoxExtent());
 }
+
 
 void AProbabilisticSensor::Tick(float DeltaSeconds)
 {
   Super::Tick(DeltaSeconds);
 
   //Initiate the Objectlist to the streaming
-  TArray<FProbabilisticSensor> SendActors;
+  SendActors.clear();
 
   // Define the Parameters for Linetrace
   TraceParams = FCollisionQueryParams(FName(TEXT("Laser_Trace")), true, GetOwner());
@@ -235,6 +225,8 @@ void AProbabilisticSensor::Tick(float DeltaSeconds)
 
   // Get the Capsule Transformation from component to world.
   FTransform SensorTransform = Capsule->GetComponentTransform();
+  FRotator SensorRotation = Capsule -> GetComponentRotation();
+  FVector SensorVel = SensorRotation.UnrotateVector(GetOwner()-> GetVelocity()); 
   // Get the Registry of actors
   const FActorRegistry &Registry = GetEpisode().GetActorRegistry();
 
@@ -247,6 +239,7 @@ void AProbabilisticSensor::Tick(float DeltaSeconds)
       // Take the relative position between sensor and object
       FTransform ObjectTransform = Object->GetTransform();
       FVector RelativePosition = ObjectTransform.GetRelativeTransform(SensorTransform).GetTranslation();
+
       // UE_LOG(LogTemp, Warning, TEXT("%s"), *RelativePosition.ToString()); // Uncomment for debugging
 
       // if the Object is inside the FOV
@@ -261,10 +254,10 @@ void AProbabilisticSensor::Tick(float DeltaSeconds)
       }
       if (Angle <= Probabilistic.Fov.Horizontal/2.0f)
       {
-        UE_LOG(LogTemp, Warning, TEXT("It is inside the FOV")); // uncomment for Debugging
+        //UE_LOG(LogTemp, Warning, TEXT("It is inside the FOV")); // uncomment for Debugging
 
         // Draw Linetrace line for debug
-        DrawDebugLine(
+        /*DrawDebugLine(
             GetWorld(),
             SensorTransform.GetTranslation(),
             ObjectTransform.GetTranslation() + FVector(0.f, 0.f, 50.f),
@@ -272,19 +265,21 @@ void AProbabilisticSensor::Tick(float DeltaSeconds)
             false,
             0.0f,
             0,
-            5.f);
+            5.f);*/
 
         // Get Carla Id of the object being evaluated
         const FCarlaActor *collide = Registry.FindCarlaActor(Object);
         int ObjIdx = collide->GetActorId();
         int LineTraceObjIdx = 0;
+        FBoundingBox Box; 
+
 
         // Execute the Linetrace between the sensor and the object,
         FHitResult Hit;
         GetWorld()->ParallelLineTraceSingleByChannel(
             Hit,
             SensorTransform.GetTranslation(),
-            ObjectTransform.GetTranslation() + FVector(0.f, 0.f, 50.f), //(50 cm are add to the object hight so that the Linetrace does not pass under the vehicle)
+            ObjectTransform.GetTranslation() + FVector(0.f, 0.f, 30.f), //(30 cm are add to the object hight so that the Linetrace does not pass under the vehicle)
             ECC_GameTraceChannel2,
             TraceParams,
             FCollisionResponseParams::DefaultResponseParam);
@@ -297,16 +292,18 @@ void AProbabilisticSensor::Tick(float DeltaSeconds)
           // Get the Carla ID of this actor
           if (actor != nullptr)
           {
-            UE_LOG(LogTemp, Warning, TEXT("The Laser hit the %s"), *actor->GetName()) // Uncomment for Debugging
+            //UE_LOG(LogTemp, Warning, TEXT("The Laser hit the %s"), *actor->GetName()) // Uncomment for Debugging
             const FCarlaActor *ActualActor = Registry.FindCarlaActor(actor);
             if (ActualActor)
             {
               LineTraceObjIdx = ActualActor->GetActorId();
+              Box = ActualActor->GetActorInfo()->BoundingBox;
+              
             }
           }
           else
           {
-            UE_LOG(LogCarla, Warning, TEXT("Actor not valid %p!!!!"), actor);
+            //UE_LOG(LogCarla, Warning, TEXT("Actor not valid %p!!!!"), actor);
           }
         }
 
@@ -316,57 +313,77 @@ void AProbabilisticSensor::Tick(float DeltaSeconds)
         }
         else
         {
-          UE_LOG(LogTemp, Warning, TEXT("%p is in the FOV and is visible!!!!"), Object);
-          FProbabilisticSensor TempActor; 
-          if (Probabilistic.NoiseType == 0)/// Type of noise 0:Ideal
-          {
-            FVector TempOrigin;
-            FVector TempDimension;
-            TempActor.ObjectID = LineTraceObjIdx; 
-            TempActor.Position = RelativePosition;
-            Object -> GetActorBounds(false, TempOrigin, TempDimension);
-            TempActor.Dimension = TempDimension*2;
-            FRotator TempRotator = Object -> GetActorRotation();
-            TempActor.Orientation = {TempRotator.Roll, TempRotator.Pitch, TempRotator.Yaw}; 
-            TempActor.Velocity = Object -> GetVelocity();
-            TempActor.Classification = 1;
+        
+          FVector TempDimension = Box.Extent;
+          
+          FVector TempVel = Object-> GetVelocity();
+          TempVel = SensorRotation.UnrotateVector(TempVel);
 
-            SendActors.Emplace(TempActor);
-            }
+          float Yaw = Object -> GetActorRotation().Yaw - SensorRotation.Yaw;
+          if (Yaw > 180.f)
+          {
+            Yaw = Yaw - 360.f; 
+          }
+          else if (Yaw < -180.f)
+          {
+            Yaw = Yaw + 360.f; 
+          }
+
+          //UE_LOG(LogTemp, Warning, TEXT("%p is in the FOV and is visible!!!!"), Object);  //  Uncomment to debug
+
+          if (Probabilistic.NoiseType == 0)/// Type of noise 0:Ideal
+          {         
+            //UE_LOG(LogTemp, Warning, TEXT("Sensor velocity X = %f, Sensor velocity Y = %f, Object velocity X = %f, Object velocity Y = %f, Sensor Yaw = %f "), SensorVel.X, SensorVel.Y,TempVel.X,TempVel.Y, SensorRotation.Yaw); // uncomment for Debugging
+
+            SendActors.push_back({LineTraceObjIdx,
+              RelativePosition.X/100.f, // cm to m
+              -RelativePosition.Y/100.f, // cm to m (Unreal Engine do not follow the Right Hand Rule, change the signal)
+              TempVel.X/100.f - SensorVel.X/100.f, // Relative Velocity cm/s to m/s
+              SensorVel.Y/100.f - TempVel.Y/100.f,// Relative Velocity cm/s to m/s
+              -Yaw,
+              TempDimension.X*0.02f,
+              TempDimension.Y*0.02f,
+              TempDimension.Z*0.02f,
+              GetClassification(Object -> GetName(), TempDimension.X*0.02f)});
+ 
+          }
+          
           else if (Probabilistic.NoiseType == 1)/// Type of noise 1:Cartesian (Camera and Lidar).
           {
-            FVector TempOrigin;
             // include errors
-            /*
-            const auto Noise = ForwardVector * RandomEngine->GetNormalDistribution(0.0f, Description.NoiseStdDev);
-            Detection.point += Noise*/
-            FVector TempDimension;
-            TempActor.ObjectID = LineTraceObjIdx; 
-            TempActor.Position = RelativePosition;
-            Object -> GetActorBounds(false, TempOrigin, TempDimension);
-            TempActor.Dimension = TempDimension*2;
-            FRotator TempRotator = Object -> GetActorRotation();
-            TempActor.Orientation = {TempRotator.Roll, TempRotator.Pitch, TempRotator.Yaw}; 
-            TempActor.Velocity = Object -> GetVelocity();
-            TempActor.Classification = 1;
+            //const auto Noise = ForwardVector * RandomEngine->GetNormalDistribution(0.0f, Description.NoiseStdDev);
+            //Detection.point += Noise
 
-            SendActors.Emplace(TempActor);
+              SendActors.push_back({LineTraceObjIdx,
+              RelativePosition.X/100.f, // cm to m
+              -RelativePosition.Y/100.f, // cm to m (Unreal Engine do not follow the Right Hand Rule, change the signal)
+              nanf("N"), // Relative Velocity cm/s to m/s
+              nanf("N"),// Relative Velocity cm/s to m/s
+              -Yaw,
+              TempDimension.X*0.02f,
+              TempDimension.Y*0.02f,
+              TempDimension.Z*0.02f,
+              GetClassification(Object -> GetName(), TempDimension.X*0.02f)});
+            
           }
           else if (Probabilistic.NoiseType == 2)/// Type of noise 2:Spherical (Radar).
           {
 
-            //Tranform the coordinates 
-            FVector TempOrigin;
+            /*FVector TempOrigin;
             FVector TempDimension;
-            TempActor.ObjectID = LineTraceObjIdx; 
-            TempActor.Position = RelativePosition;
+            TempActor.objectid = LineTraceObjIdx; 
+            TempActor.position_x = RelativePosition.X;
+            TempActor.position_y = RelativePosition.Y;
             Object -> GetActorBounds(false, TempOrigin, TempDimension);
-            TempActor.Dimension = TempDimension*2;
-            FRotator TempRotator = Object -> GetActorRotation();
-            TempActor.Orientation = {TempRotator.Roll, TempRotator.Pitch, TempRotator.Yaw}; 
-            TempActor.Velocity = Object -> GetVelocity();
-            TempActor.Classification = 1;
-            SendActors.Emplace(TempActor);
+            TempActor.length = TempDimension.X*2;
+            TempActor.width = TempDimension.Y*2;
+            TempActor.height = TempDimension.Z*2;
+            TempActor.orientation = Object -> GetActorRotation().Yaw;
+            TempActor.velocity_y = Object -> GetVelocity().Y;
+            TempActor.velocity_x = Object -> GetVelocity().X;
+            TempActor.classification = 1;
+
+            SendActors.push_back(TempActor);*/
           }
         }
       }
@@ -380,4 +397,59 @@ void AProbabilisticSensor::Tick(float DeltaSeconds)
     auto Stream = GetDataStream(*this);
     Stream.Send(*this, SendActors);
   }
+}
+
+
+int AProbabilisticSensor::GetClassification(FString Name, float Length) {
+
+    //  TYPE_UNKNOWN = 0, TYPE_OTHER = 1, TYPE_SMALL_CAR = 2, TYPE_COMPACT_CAR = 3,
+    //  TYPE_MEDIUM_CAR = 4, TYPE_LUXURY_CAR = 5, TYPE_DELIVERY_VAN = 6, TYPE_HEAVY_TRUCK = 7,
+    //  TYPE_SEMITRAILER = 8, TYPE_TRAILER = 9, TYPE_MOTORBIKE = 10, TYPE_BICYCLE = 11,
+    //  TYPE_BUS = 12, TYPE_TRAM = 13, TYPE_TRAIN = 14, TYPE_WHEELCHAIR = 15, TYPE_PEDESTRIAN = 99
+
+    int Classification = 0; // Unknown
+
+    UE_LOG(LogTemp, Warning, TEXT("The Name is %s"), *Name); // Uncomment for debugging
+    
+    if (Name.Contains("walker"))
+    {
+      Classification = 99; //pedestrian
+    }
+    else if ( Name.Contains("audi") || Name.Contains("bmw") || Name.Contains("chevrolet")|| Name.Contains("citroen")|| Name.Contains("mercedes")|| Name.Contains("charger")|| Name.Contains("jeep")|| Name.Contains("lincoln")|| Name.Contains("mini")|| Name.Contains("mustang")|| Name.Contains("crown")|| Name.Contains("nissan")|| Name.Contains("seat")|| Name.Contains("tesla")|| Name.Contains("toyota")|| Name.Contains("cybertruck"))
+    {
+      if (Length <= 4.1)
+      {
+        Classification = 2; // Small Car
+      }
+      else if (Length <= 4.4)
+      {
+        Classification = 3; // Compact Car
+      }
+      else if (Length < 4.7)
+      {
+        Classification = 4; // Medium Car
+      }
+      else
+      {
+        Classification = 5; // Luxury Car
+      }
+    }
+    else if (Name.Contains("sprinter") || Name.Contains("volkswagen")|| Name.Contains("ambulance"))
+    {
+      Classification = 6; //Delivery Van - Including VW T2 and Ambulance
+    }
+    else if (Name.Contains("harley") || Name.Contains("kawasaki") ||Name.Contains("yamaha")|| Name.Contains("vespa"))
+    {
+      Classification = 10; // Motorbike
+    }
+    else if (Name.Contains("bike"))
+    {
+      Classification = 11; // Bicycle
+    }
+    else if (Name.Contains("carlacola") || Name.Contains("firetruck"))
+    {
+      Classification = 7; // Truck
+    }
+
+  return Classification;
 }
