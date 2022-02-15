@@ -30,6 +30,7 @@ private:
   std::vector<FProbabilisticSensor> SendActors;
 
   static int GetClassification(FString Name, float Length);
+  static float CalculateArcTan(float X, float Y);
 
   UPROPERTY()
   FProbabilisticDescription Probabilistic;
@@ -38,5 +39,13 @@ private:
   UCapsuleComponent *Capsule = nullptr;
 
   FCollisionQueryParams TraceParams;
+
+  /// Seed of the pseudo-random engine.
+  //UPROPERTY(Category = "Random Probabilistic", EditAnywhere)
+  //int32 RandomSeed = 123456789;
+
+  /// Random Engine used to provide noise for sensor output.
+  UPROPERTY()
+  URandomEngine *RandomProbabilistic = nullptr;
 
 };

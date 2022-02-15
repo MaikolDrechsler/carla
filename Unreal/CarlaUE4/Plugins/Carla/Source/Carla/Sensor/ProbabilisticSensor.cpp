@@ -15,6 +15,7 @@ AProbabilisticSensor::AProbabilisticSensor(const FObjectInitializer &ObjectIniti
   Capsule->SetupAttachment(RootComponent);
   //Capsule->SetHiddenInGame(false); // Uncomment for debugging.
   Capsule->SetCollisionProfileName(FName("OverlapAll"));
+  RandomProbabilistic = CreateDefaultSubobject<URandomEngine>(TEXT("RandomProbabilistic"));
 
   PrimaryActorTick.bCanEverTick = true;
 }
@@ -26,9 +27,7 @@ FActorDefinition AProbabilisticSensor::GetSensorDefinition()
       TEXT("probabilistic"));
 
   // - Sensor Type  ----------------------------------
-  // Ideal
-  // Radial noise
-  // Cartesian noise
+  // Ideal == 0;   // Cartesian noise == 1; // Radial noise == 2;
   FActorVariation NoiseType;
   NoiseType.Id = TEXT("noise_type");
   NoiseType.Type = EActorAttributeType::Int;
@@ -52,8 +51,8 @@ FActorDefinition AProbabilisticSensor::GetSensorDefinition()
   // - Standard Deviation -----------------------------
   FActorVariation NoiseSeed;
   NoiseSeed.Id = TEXT("noise_seed");
-  NoiseSeed.Type = EActorAttributeType::Float;
-  NoiseSeed.RecommendedValues = {TEXT("0")};
+  NoiseSeed.Type = EActorAttributeType::Int;
+  NoiseSeed.RecommendedValues = {TEXT("123456789")};
   NoiseSeed.bRestrictToRecommended = false;
 
   FActorVariation StdDevX;
@@ -68,12 +67,6 @@ FActorDefinition AProbabilisticSensor::GetSensorDefinition()
   StdDevY.RecommendedValues = {TEXT("1.0")};
   StdDevY.bRestrictToRecommended = false;
 
-  FActorVariation StdDevZ;
-  StdDevZ.Id = TEXT("noise_stddev_z");
-  StdDevZ.Type = EActorAttributeType::Float;
-  StdDevZ.RecommendedValues = {TEXT("0.1")};
-  StdDevZ.bRestrictToRecommended = false;
-
   FActorVariation StdDevR;
   StdDevR.Id = TEXT("noise_stddev_radius");
   StdDevR.Type = EActorAttributeType::Float;
@@ -85,12 +78,6 @@ FActorDefinition AProbabilisticSensor::GetSensorDefinition()
   StdDevHorizontal.Type = EActorAttributeType::Float;
   StdDevHorizontal.RecommendedValues = {TEXT("1.0")};
   StdDevHorizontal.bRestrictToRecommended = false;
-
-  FActorVariation StdDevVertical;
-  StdDevVertical.Id = TEXT("noise_stddev_vertical");
-  StdDevVertical.Type = EActorAttributeType::Float;
-  StdDevVertical.RecommendedValues = {TEXT("1.0")};
-  StdDevVertical.bRestrictToRecommended = false;
 
   FActorVariation VelStdDevR;
   VelStdDevR.Id = TEXT("noise_stddev_vel_radius");
@@ -104,13 +91,7 @@ FActorDefinition AProbabilisticSensor::GetSensorDefinition()
   VelStdDevHorizontal.RecommendedValues = {TEXT("1.0")};
   VelStdDevHorizontal.bRestrictToRecommended = false;
 
-  FActorVariation VelStdDevVertical;
-  VelStdDevVertical.Id = TEXT("stddev_vel_vertical");
-  VelStdDevVertical.Type = EActorAttributeType::Float;
-  VelStdDevVertical.RecommendedValues = {TEXT("1.0")};
-  VelStdDevVertical.bRestrictToRecommended = false;
-
-  Definition.Variations.Append({NoiseType, Range, HorizontalFOV, NoiseSeed, StdDevX, StdDevY, StdDevZ, StdDevR, StdDevHorizontal, StdDevVertical, VelStdDevR, VelStdDevHorizontal, VelStdDevVertical});
+  Definition.Variations.Append({NoiseType, Range, HorizontalFOV, NoiseSeed, StdDevX, StdDevY, StdDevR, StdDevHorizontal, VelStdDevR, VelStdDevHorizontal});
 
   return Definition;
 }
@@ -131,20 +112,16 @@ void AProbabilisticSensor::Set(const FActorDescription &Description)
       "horizontal_fov",
       Description.Variations,
       180.f);
-  Probabilistic.NoiseSeed = UActorBlueprintFunctionLibrary::RetrieveActorAttributeToFloat(
+  Probabilistic.NoiseSeed = UActorBlueprintFunctionLibrary::RetrieveActorAttributeToInt(
       "noise_seed",
       Description.Variations,
-      0.0f);
+      123456798);
   Probabilistic.PosNoise.X = UActorBlueprintFunctionLibrary::RetrieveActorAttributeToFloat(
       "noise_stddev_x",
       Description.Variations,
       1.f);
   Probabilistic.PosNoise.Y = UActorBlueprintFunctionLibrary::RetrieveActorAttributeToFloat(
       "noise_stddev_y",
-      Description.Variations,
-      1.f);
-  Probabilistic.PosNoise.Z = UActorBlueprintFunctionLibrary::RetrieveActorAttributeToFloat(
-      "noise_stddev_z",
       Description.Variations,
       1.f);
   Probabilistic.PosNoiseSph.Radius = UActorBlueprintFunctionLibrary::RetrieveActorAttributeToFloat(
@@ -155,10 +132,6 @@ void AProbabilisticSensor::Set(const FActorDescription &Description)
       "noise_stddev_horizontal",
       Description.Variations,
       1.f);
-  Probabilistic.PosNoiseSph.Vertical = UActorBlueprintFunctionLibrary::RetrieveActorAttributeToFloat(
-      "noise_stddev_vertical",
-      Description.Variations,
-      1.f);
   Probabilistic.VelNoiseSph.Radius = UActorBlueprintFunctionLibrary::RetrieveActorAttributeToFloat(
       "noise_stddev_vel_radius",
       Description.Variations,
@@ -166,11 +139,7 @@ void AProbabilisticSensor::Set(const FActorDescription &Description)
   Probabilistic.VelNoiseSph.Horizontal = UActorBlueprintFunctionLibrary::RetrieveActorAttributeToFloat(
       "noise_stddev_vel_horizontal",
       Description.Variations,
-      1.f);
-  Probabilistic.VelNoiseSph.Vertical = UActorBlueprintFunctionLibrary::RetrieveActorAttributeToFloat(
-      "noise_stddev_vel_vertical",
-      Description.Variations,
-      1.f);
+      1.f); 
 
   if (Probabilistic.NoiseType == 0)
   {
@@ -192,14 +161,13 @@ void AProbabilisticSensor::Set(const FActorDescription &Description)
 
   constexpr float M_TO_CM = 100.0f; // Unit conversion.
   Capsule->SetCapsuleSize(M_TO_CM * Probabilistic.Fov.Radius, 50.f);
+  //RandomSeed = Probabilistic.NoiseSeed;
 }
 
 void AProbabilisticSensor::SetOwner(AActor *Owner)
 {
   Super::SetOwner(Owner);
-
 }
-
 
 void AProbabilisticSensor::Tick(float DeltaSeconds)
 {
@@ -298,7 +266,6 @@ void AProbabilisticSensor::Tick(float DeltaSeconds)
             {
               LineTraceObjIdx = ActualActor->GetActorId();
               Box = ActualActor->GetActorInfo()->BoundingBox;
-              
             }
           }
           else
@@ -337,10 +304,10 @@ void AProbabilisticSensor::Tick(float DeltaSeconds)
 
             SendActors.push_back({LineTraceObjIdx,
               RelativePosition.X/100.f, // cm to m
-              -RelativePosition.Y/100.f, // cm to m (Unreal Engine do not follow the Right Hand Rule, change the signal)
+              RelativePosition.Y/100.f, // cm to m
               TempVel.X/100.f - SensorVel.X/100.f, // Relative Velocity cm/s to m/s
-              SensorVel.Y/100.f - TempVel.Y/100.f,// Relative Velocity cm/s to m/s
-              -Yaw,
+              TempVel.Y/100.f - SensorVel.Y/100.f,// Relative Velocity cm/s to m/s
+              Yaw,
               TempDimension.X*0.02f,
               TempDimension.Y*0.02f,
               TempDimension.Z*0.02f,
@@ -351,49 +318,52 @@ void AProbabilisticSensor::Tick(float DeltaSeconds)
           else if (Probabilistic.NoiseType == 1)/// Type of noise 1:Cartesian (Camera and Lidar).
           {
             // include errors
-            //const auto Noise = ForwardVector * RandomEngine->GetNormalDistribution(0.0f, Description.NoiseStdDev);
-            //Detection.point += Noise
-
-              SendActors.push_back({LineTraceObjIdx,
-              RelativePosition.X/100.f, // cm to m
-              -RelativePosition.Y/100.f, // cm to m (Unreal Engine do not follow the Right Hand Rule, change the signal)
-              nanf("N"), // Relative Velocity cm/s to m/s
-              nanf("N"),// Relative Velocity cm/s to m/s
-              -Yaw,
+            SendActors.push_back({LineTraceObjIdx,
+              RelativePosition.X/100.f + RandomProbabilistic -> GetNormalDistribution(0.0f, Probabilistic.PosNoise.X), // cm to m
+              RelativePosition.Y/100.f + RandomProbabilistic -> GetNormalDistribution(0.0f, Probabilistic.PosNoise.Y), // cm to m
+              nanf("NaN"), // No velocity data
+              nanf("Nan"),// No velocity data
+              Yaw,
               TempDimension.X*0.02f,
               TempDimension.Y*0.02f,
               TempDimension.Z*0.02f,
-              GetClassification(Object -> GetName(), TempDimension.X*0.02f)});
-            
+              GetClassification(Object -> GetName(), TempDimension.X*0.02f)
+              });          
           }
+          
           else if (Probabilistic.NoiseType == 2)/// Type of noise 2:Spherical (Radar).
           {
-
-            /*FVector TempOrigin;
-            FVector TempDimension;
-            TempActor.objectid = LineTraceObjIdx; 
-            TempActor.position_x = RelativePosition.X;
-            TempActor.position_y = RelativePosition.Y;
-            Object -> GetActorBounds(false, TempOrigin, TempDimension);
-            TempActor.length = TempDimension.X*2;
-            TempActor.width = TempDimension.Y*2;
-            TempActor.height = TempDimension.Z*2;
-            TempActor.orientation = Object -> GetActorRotation().Yaw;
-            TempActor.velocity_y = Object -> GetVelocity().Y;
-            TempActor.velocity_x = Object -> GetVelocity().X;
-            TempActor.classification = 1;
-
-            SendActors.push_back(TempActor);*/
+            // Calculate Relative Velocity
+            FVector RelativeVelocity = {TempVel.X/100.f - SensorVel.X/100.f,TempVel.Y/100.f - SensorVel.Y/100.f,0.0f};
+            
+            // Calculate spherical position to apply errors 
+            float Theta = CalculateArcTan(RelativePosition.X,RelativePosition.Y) + RandomProbabilistic -> GetNormalDistribution(0.0f, Probabilistic.PosNoiseSph.Horizontal);
+            float Radius = sqrt(pow(RelativePosition.X,2) + pow(RelativePosition.Y,2))+RandomProbabilistic -> GetNormalDistribution(0.0f, Probabilistic.PosNoiseSph.Radius);
+            
+            // Calculate spherical velocity to apply errors
+            float ThetaVel = CalculateArcTan(RelativeVelocity.X,RelativeVelocity.Y)+ RandomProbabilistic -> GetNormalDistribution(0.0f, Probabilistic.VelNoiseSph.Horizontal);
+            float RadiusVel = sqrt(pow(RelativeVelocity.X,2) + pow(RelativeVelocity.Y,2)) + RandomProbabilistic -> GetNormalDistribution(0.0f, Probabilistic.VelNoiseSph.Radius);
+            
+            // Append the object data to the Array
+            SendActors.push_back({LineTraceObjIdx,
+              Radius*sin(Theta), 
+              Radius*cos(Theta),
+              RadiusVel*sin(ThetaVel), 
+              RadiusVel*cos(ThetaVel),
+              Yaw,
+              TempDimension.X*0.02f,
+              TempDimension.Y*0.02f,
+              TempDimension.Z*0.02f,
+              GetClassification(Object -> GetName(), TempDimension.X*0.02f)
+              });
           }
         }
       }
-      // In Case it is out of the FOV
-      else
+      else // In Case it is out of the FOV
       {
         DetectedActors.Remove(Object);
       }
     }
-
     auto Stream = GetDataStream(*this);
     Stream.Send(*this, SendActors);
   }
@@ -409,7 +379,7 @@ int AProbabilisticSensor::GetClassification(FString Name, float Length) {
 
     int Classification = 0; // Unknown
 
-    UE_LOG(LogTemp, Warning, TEXT("The Name is %s"), *Name); // Uncomment for debugging
+    //UE_LOG(LogTemp, Warning, TEXT("The Name is %s"), *Name); // Uncomment for debugging
     
     if (Name.Contains("walker"))
     {
@@ -452,4 +422,13 @@ int AProbabilisticSensor::GetClassification(FString Name, float Length) {
     }
 
   return Classification;
+}
+
+float AProbabilisticSensor::CalculateArcTan(float X, float Y){
+  if (X >= -0.0000001f && X <= 0.0000001f)
+  {
+    X = 0.0000001f;
+  }
+  float Theta = atan(Y/X);
+  return Theta;
 }

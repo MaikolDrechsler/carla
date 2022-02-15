@@ -25,7 +25,7 @@ struct CARLA_API FProbabilisticDescription
   /// Probabilistic errors.
   /// Random seed for the noise/dropoff used by this sensor.
   UPROPERTY(EditAnywhere)
-  float NoiseSeed = 0.0f;
+  int NoiseSeed = 0.0f;
 
   /// Position noise cartesian
   UPROPERTY(EditAnywhere)
