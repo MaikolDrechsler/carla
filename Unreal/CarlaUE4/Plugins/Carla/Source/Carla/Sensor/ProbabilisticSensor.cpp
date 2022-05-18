@@ -199,7 +199,7 @@ void AProbabilisticSensor::Tick(float DeltaSeconds)
   const FActorRegistry &Registry = GetEpisode().GetActorRegistry();
 
   // If any object was detected inside the capsule
-  if (DetectedActors.Num() > 0)
+  if (DetectedActors.Num() >= 0)
   {
     // For each one of the objects inside the capsule
     for (auto &Object : DetectedActors)

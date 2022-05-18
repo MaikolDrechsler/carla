@@ -1,6 +1,6 @@
 #pragma once
 
-#include "carla/rpc/Location.h"
+//#include "carla/rpc/Location.h"
 //#include "carla/rpc/Rotation.h"
 //#include "carla/sensor/data/SemanticLidarData.h"
 //#include "Math/Vector.h"

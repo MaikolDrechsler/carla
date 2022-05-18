@@ -7,7 +7,13 @@ import time
 
 ### Define sensor callback
 def callback(event):
-    print(event.timestamp)
+    #print(event.timestamp)
+    #print (event[0].objectid)
+    #print (event[0].position_x)
+    #print (event[0].position_y)
+    #print (event[0].velocity_x)
+    #print (event[0].velocity_y)
+    #print (event[0].orientation)
     for actor in event:
         print(actor)
 
@@ -39,7 +45,7 @@ ego = vehicles[0]
 ### Find Probabilistic sensor blueprint and set the attibutes
 blueprint_library = world.get_blueprint_library()
 blueprint = blueprint_library.find('sensor.other.probabilistic')
-blueprint.set_attribute('noise_type', '2') # 0 for Ideal, 1 for cartesian and 2 for spherical
+#blueprint.set_attribute('noise_type', '2') # 0 for Ideal, 1 for cartesian and 2 for spherical
 blueprint.set_attribute('range', '30.0')
 blueprint.set_attribute('horizontal_fov', '180.0')
 blueprint.set_attribute('noise_seed', '12345')
